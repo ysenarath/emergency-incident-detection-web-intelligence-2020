@@ -20,7 +20,7 @@ def project_coordinates(lng, lat, radius=None):
     center = Point(float(lng), float(lat))
     point_transformed = transform(wgs84_to_aeqd, center)
     if radius is not None:
-        buffer = point_transformed.buffer(radius)  # in meters
+        buffer = point_transformed.buffer(int(radius))  # in meters
     else:
         buffer = point_transformed
     # Get the polygon with lat lon coordinates

@@ -47,36 +47,29 @@ def calculate_posterior(df, r, time_step):
     if time_step.endswith('.5'):
         time_step = time_step.split('.')[0]
         sec = '30S'
+    df.loc[:, 'reliability_1'] = df.loc[:, 'reliability'].apply(p)
+    df.drop('reliability', axis=1, inplace=True)
+    df.loc[:, 'reliability_0'] = 1 - df.loc[:, 'reliability_1']
     time_steps_records = df.set_index('time').resample(f'{time_step}T{sec}')
-    # Matrix - containes total likelihood
-    matrix = time_steps_records.apply(calculate_likelihood)
-    # Find likelihood, prior for first time period
-    likelihood = matrix.iloc[0, :]
+    matrix = time_steps_records.apply(np.prod)
+    p_w_1 = matrix.reliability_1
+    matrix.drop('reliability_1', axis=1, inplace=True)
+    p_w_0 = matrix.reliability_0
+    matrix.drop('reliability_0', axis=1, inplace=True)
+    # Calculate region priors
     prior = np.array([region_prior(c, matrix.index[0]) for c in matrix])
-    # Calcualate prior for I = 0 for first time period
-    p_0 = (1 - np.sum(prior))
-    # Calcualate likelihood for I = 0 for all periods using reliability of waze reports prod(1-p)
-    l_0 = time_steps_records.apply(lambda m: (1 - m.reliability.apply(p)).prod())
-    denom = np.sum(likelihood * prior) + l_0[0] * p_0
-    # For each time step calculate posterior (start with zero row - special case)
-    # matrix - containes posteriors [partly]
-    matrix.iloc[0, :] = likelihood * prior / denom
-    p_0 = l_0[0] * p_0 / denom
-    return_row = [True for _ in range(matrix.shape[0])]
+    p_1 = np.sum(prior)
+    p_0 = 1 - p_1
+    p_1_w = p_w_1.iloc[0] * p_1 / (p_w_1.iloc[0] * p_1 + p_w_0.iloc[0] * p_0)
+    p_0_w = 1 - p_1_w
+    matrix.iloc[0, :] = p_1_w * (matrix.iloc[0, :] * prior / np.sum(matrix.iloc[0, :] * prior))
     for ridx in range(1, matrix.shape[0]):
         prior = matrix.iloc[ridx - 1, :]
-        likelihood = matrix.iloc[ridx, :]
-        if np.sum(likelihood) == 0:
-            matrix.iloc[ridx, :] = prior
-            return_row[ridx] = False
-            continue
-        # Calculate denominator of posterior
-        denom = np.sum(likelihood * prior) + l_0[ridx] * p_0
-        # Calculate posterior
-        matrix.iloc[ridx, :] = likelihood * prior / denom
-        p_0 = l_0[ridx] * p_0 / denom
+        p_1, p_0 = p_1_w, 1 - p_1_w
+        p_1_w = p_w_1.iloc[ridx] * p_1 / (p_w_1.iloc[ridx] * p_1 + p_w_0.iloc[ridx] * p_0)
+        matrix.iloc[ridx, :] = p_1_w * (matrix.iloc[ridx, :] * prior / np.sum(matrix.iloc[ridx, :] * prior))
     # Return posteriors
-    return matrix[return_row].index, matrix[return_row].loc[:, r]
+    return matrix.index, matrix.loc[:, r]
 
 
 def predict_proba(df, incident_interval=25, time_step='5'):

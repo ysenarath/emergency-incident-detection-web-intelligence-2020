@@ -149,7 +149,7 @@ def predict(year, month, radius, aperture_size, incident_interval, time_step, se
 # Test Parameters
 # -----------------------------------
 # WAZE Radius - 500, 1000, 1500
-# H3 Grid Resolutions - 6 and 7
+# H3 Grid Resolutions - 6, 7 # , 8
 # T' - incident interval -- 5, 15, 25
 # T - time step -- 1, 2.5, 5
 
