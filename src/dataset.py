@@ -30,11 +30,10 @@ def load_incidents(aperture_size=None, df_freq=None):
         df = pd.read_pickle('resources/tdot_testing_incidents.pk')
         df_freq = df.groupby(
             ['unit_segment_id', 'GPS Coordinate Latitude', 'GPS Coordinate Longitude',
-             'timestamp']).size()
-        df_freq = df_freq.reset_index()
-        df_freq.columns = ['segment_id', 'lat', 'lng', 'timestamp', 'count']
+             'timestamp']).size().reset_index()
+        df_freq.set_axis(['segment_id', 'lat', 'lng', 'timestamp', 'count'], axis=1, inplace=True)
         df_freq.loc[:, 'segment_id'] = df_freq.segment_id.apply(int)
-        df_freq['time'] = pd.to_datetime(df_freq['timestamp'], unit='s')
+        df_freq.loc[:, 'time'] = pd.to_datetime(df_freq['timestamp'], unit='s')
     if aperture_size is not None:
         aperture_size = int(aperture_size)
         df_freq.loc[:, 'region'] = df_freq.apply(lambda x: h3.geo_to_h3(x.lat, x.lng, aperture_size), 1)

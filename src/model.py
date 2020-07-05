@@ -12,6 +12,8 @@ from dataset import load_incidents
 
 df_freq = load_incidents()
 
+df_freq = df_freq[df_freq.time < '2019-10-01']
+
 
 def h3_get_neighbors(region, columns=None):
     if region.startswith('r_'):
@@ -25,8 +27,10 @@ def region_prior(region, time):
     # change to historical data values
     # use labels_prv to prevent overfitting
     # return 1 / len(np.unique(labels.region))
-    # return np.sum((incident_df.region == region[2:]) & (time.hour == incident_df.time.dt.hour)) / len(incident_df)
-    return np.sum(incident_df.region == region[2:]) / len(incident_df)
+    lower = len(incident_df) + len(np.unique(incident_df.region)) * 24
+    prior = (np.sum((incident_df.region == region[2:]) & (incident_df.time.dt.hour == time.hour)) + 1) / lower
+    # prior = np.sum(incident_df['region'] == region[2:]) / len(incident_df)
+    return prior
 
 
 def p(r):
@@ -34,34 +38,24 @@ def p(r):
     return r / 10
 
 
-def calculate_likelihood(m):
-    c = m.reliability.apply(p)
-    m.drop('reliability', axis=1, inplace=True)
-    if m.shape[0] == 0:
-        m.loc[0], c = np.zeros(m.shape[1]), 0
-    return (m.T * c).T.prod(axis=0)
-
-
 def calculate_posterior(df, r, time_step):
+    df = df.assign(reliability_1=df.loc[:, 'reliability'].apply(p))
+    df = df.assign(reliability_0=1 - df.loc[:, 'reliability_1'])
+    df = df.drop('reliability', axis=1)
     sec = ''
     if time_step.endswith('.5'):
         time_step = time_step.split('.')[0]
         sec = '30S'
-    df.loc[:, 'reliability_1'] = df.loc[:, 'reliability'].apply(p)
-    df.drop('reliability', axis=1, inplace=True)
-    df.loc[:, 'reliability_0'] = 1 - df.loc[:, 'reliability_1']
-    time_steps_records = df.set_index('time').resample(f'{time_step}T{sec}')
-    matrix = time_steps_records.apply(np.prod)
-    p_w_1 = matrix.reliability_1
-    matrix.drop('reliability_1', axis=1, inplace=True)
-    p_w_0 = matrix.reliability_0
-    matrix.drop('reliability_0', axis=1, inplace=True)
+    matrix = df.set_index('time').resample(f'{time_step}T{sec}').apply(np.prod)
+    p_w_1 = matrix.loc[:, 'reliability_1']
+    matrix = matrix.drop('reliability_1', axis=1)
+    p_w_0 = matrix.loc[:, 'reliability_0']
+    matrix = matrix.drop('reliability_0', axis=1)
     # Calculate region priors
     prior = np.array([region_prior(c, matrix.index[0]) for c in matrix])
     p_1 = np.sum(prior)
     p_0 = 1 - p_1
     p_1_w = p_w_1.iloc[0] * p_1 / (p_w_1.iloc[0] * p_1 + p_w_0.iloc[0] * p_0)
-    p_0_w = 1 - p_1_w
     matrix.iloc[0, :] = p_1_w * (matrix.iloc[0, :] * prior / np.sum(matrix.iloc[0, :] * prior))
     for ridx in range(1, matrix.shape[0]):
         prior = matrix.iloc[ridx - 1, :]
