@@ -41,7 +41,7 @@ date_to_filter = st.date_input('Date to Filter')  # min: 0h, max: 23h, default: 
 time_to_filter = datetime.datetime.combine(date_to_filter,
                                            st.time_input('Time to Filter'))  # min: 0h, max: 23h, default: 17h
 
-period = datetime.timedelta(minutes=st.slider('Period', 0, 60, 25))
+period = datetime.timedelta(minutes=st.slider('Period', 0, 60 * 12, 25))
 
 filtered_report_df = report_df[
     (report_df.time >= time_to_filter - period) & (report_df.time <= time_to_filter + period)]
@@ -54,9 +54,10 @@ incident_map_data = filtered_incident_df.loc[:, ['lat', 'lng']].copy()
 incident_map_data.columns = ['lat', 'lon']
 
 st.write(report_map_data)
-st.write(filtered_incident_df)
+st.write(incident_map_data)
 
 st.write('Map of all Reports and Accidents')
+
 
 viewport = {
     "latitude": np.average([np.max(report_map_data.lat), np.min(report_map_data.lat)]),
@@ -67,5 +68,7 @@ layers = [
     {"data": report_map_data, "type": "ScatterplotLayer", 'getFillColor': [0, 0, 255]},
     {"data": incident_map_data, "type": "ScatterplotLayer", 'getFillColor': [255, 0, 0]}
 ]
+
+st.write(viewport)
 
 st.deck_gl_chart(viewport=viewport, layers=layers)
