@@ -4,15 +4,16 @@ import h3
 import numpy as np
 import pandas as pd
 from sklearn.compose import ColumnTransformer
+from sklearn.ensemble import RandomForestClassifier, StackingClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import cross_validate as _cross_validate
+from sklearn.model_selection import cross_validate as _cross_validate, cross_val_predict
+from sklearn.pipeline import make_pipeline
+from sklearn.tree import DecisionTreeClassifier
 from tqdm import tqdm
 
 from dataset import load_incidents
 
 df_freq = load_incidents()
-
-df_freq = df_freq[df_freq.time < '2019-10-01']
 
 
 def h3_get_neighbors(region, columns=None):
@@ -21,7 +22,19 @@ def h3_get_neighbors(region, columns=None):
     return [x for x in np.unique(columns) if h3.h3_indexes_are_neighbors(region, x[2:])]
 
 
+def region_prior_2(region, time):
+    global df_freq
+    df_freq = df_freq[df_freq.time < time]
+    resolution = h3.h3_get_resolution(region[2:])
+    incident_df = load_incidents(resolution, df_freq)
+    lower = len(incident_df) + len(np.unique(incident_df.region)) * 24
+    prior = (np.sum((incident_df.region == region[2:]) & (incident_df.time.dt.hour == time.hour)) + 1) / lower
+    return prior
+
+
 def region_prior(region, time):
+    global df_freq
+    df_freq = df_freq[df_freq.time < '2019-10-01']
     resolution = h3.h3_get_resolution(region[2:])
     incident_df = load_incidents(resolution, df_freq)
     # change to historical data values
@@ -96,14 +109,53 @@ def predict_proba(df, incident_interval=25, time_step='5'):
     return pd.DataFrame(features)
 
 
-def cross_validate(x, y):
-    feature_extractor = ColumnTransformer([
+def extract_features(x, df):
+    avg_reliabilities = []
+    counts = []
+    priors = []
+    for i in tqdm(range(x.shape[0])):
+        row = x.iloc[i]
+        s, e = row.start_time, row.end_time
+        temp = df[(df.time >= s) & (df.time <= e)]
+        priors.append(region_prior_2(row.region, s))
+        avg_reliabilities.append(np.average(temp.reliability))
+        counts.append(len(temp))
+    x = x.assign(avg_reliability=avg_reliabilities, count=counts, rand_porba=np.random.rand(x.shape[0]), priors=priors)
+    return x
+
+
+def cross_validate(x, y, model='LogisticRegression'):
+    feature_extractor_1 = ColumnTransformer([
         ('posterior_proba', 'passthrough', ['posterior_proba']),
+        # ('priors', 'passthrough', ['priors']),
+        # ('rand_porba', 'passthrough', ['rand_porba']),
         # ('is_peak', 'passthrough', ['is_peak']),
         # ('hour_enc', OneHotEncoder(), ['hour']),
         # ('region_enc', OneHotEncoder(), ['region']),
     ])
-    X = feature_extractor.fit_transform(x)
-    reg = LogisticRegression(random_state=42, class_weight='balanced')
-    cv_results = _cross_validate(reg, X, y, scoring=['accuracy', 'precision', 'recall', 'f1', 'roc_auc'], cv=5)
-    return cv_results
+    feature_extractor = ColumnTransformer([
+        ('avg_reliability', 'passthrough', ['avg_reliability']),
+        ('count', 'passthrough', ['count']),
+    ])
+    # X = feature_extractor.fit_transform(x)
+    if model == 'LogisticRegression':
+        reg1 = LogisticRegression(random_state=42, class_weight='balanced')
+        reg2 = LogisticRegression(random_state=42, class_weight='balanced')
+    elif model == 'DecisionTreeClassifier':
+        reg1 = DecisionTreeClassifier(max_depth=5, class_weight='balanced')
+        reg2 = DecisionTreeClassifier(max_depth=5, class_weight='balanced')
+    elif model == 'RandomForestClassifier':
+        reg1 = RandomForestClassifier(max_depth=3, class_weight='balanced')
+        reg2 = RandomForestClassifier(max_depth=3, class_weight='balanced')
+    if model == 'LogisticRegression':
+        reg = LogisticRegression(random_state=42, class_weight='balanced')
+    elif model == 'DecisionTreeClassifier':
+        reg = DecisionTreeClassifier(max_depth=5, class_weight='balanced')
+    elif model == 'RandomForestClassifier':
+        reg = RandomForestClassifier(max_depth=3, class_weight='balanced')
+    pipe = StackingClassifier(estimators=[('reg2', make_pipeline(feature_extractor_1, reg2)),
+                                          ('reg1', make_pipeline(feature_extractor, reg1))],
+                              final_estimator=reg)
+    cv_results = _cross_validate(pipe, x, y, scoring=['accuracy', 'precision', 'recall', 'f1', 'roc_auc'], cv=5)
+    y_pred = cross_val_predict(pipe, x, y, cv=5)
+    return cv_results, y_pred

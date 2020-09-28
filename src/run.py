@@ -146,6 +146,45 @@ def predict(year, month, radius, aperture_size, incident_interval, time_step, se
         print(k, np.average(v))
 
 
+@cli.command()
+def task():
+    year, months = 2019, [10, 11, 12]
+    select = None
+    radius, aperture_size, incident_interval, time_step = '100', '6', '25', '1'
+    config = {'year': year, 'months': months, 'radius': radius, 'aperture_size': aperture_size,
+              'incident_interval': incident_interval, 'time_step': time_step, 'select': select}
+    month = months[0]
+    df = pd.read_pickle(f'output/waze/{year}_{month}_{radius}_{aperture_size}_features.pkl')
+    for month in months[1:]:
+        temp_df = pd.read_pickle(f'output/waze/{year}_{month}_{radius}_{aperture_size}_features.pkl')
+        df = df.append(temp_df, sort=False)
+    df.fillna(0, inplace=True)
+    # if select is not None:
+    #     df = df[-1 * int(select):]
+    if os.path.exists(f'output/{year}_{month}_{radius}_{aperture_size}_predict_proba.pkl'):
+        x = pd.read_pickle(f'output/{year}_{month}_{radius}_{aperture_size}_predict_proba.pkl')
+    else:
+        x = model.predict_proba(df, int(incident_interval), time_step)
+        x = model.extract_features(x, df)
+        x.to_pickle(f'output/{year}_{month}_{radius}_{aperture_size}_predict_proba.pkl')
+    incident_df = load_incidents(aperture_size)
+    if os.path.exists(f'output/{year}_{month}_{radius}_{aperture_size}_y.pkl'):
+        y = pd.read_pickle(f'output/{year}_{month}_{radius}_{aperture_size}_y.pkl')
+    else:
+        y = label_mapper(x, incident_df)
+        pd.Series(y).to_pickle(f'output/{year}_{month}_{radius}_{aperture_size}_y.pkl')
+    models = ['LogisticRegression', 'DecisionTreeClassifier', 'RandomForestClassifier']
+    for m in models:
+        print('model', m)
+        cv_results, y_pred = model.cross_validate(x, y, m)
+        for k, v in config.items():
+            print(k, ',', v)
+        for k, v in cv_results.items():
+            print(k, ',', np.average(v))
+        print()
+        # x.assign(y_pred=y_pred, y_true=y).to_pickle(f'output/{year}_{month}_{radius}_{aperture_size}_{m}_pred.pkl')
+
+
 # Test Parameters
 # -----------------------------------
 # WAZE Radius - 500, 1000, 1500
