@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import altair as alt
 
-from dataset import read_dataset, to_datetime
+from tap.dataset import load_dataset, to_datetime
 
 
 def main():
@@ -16,7 +16,7 @@ def main():
     )
     st.header('Temporal Analysis')
     option = st.selectbox('Select Dataset: ', ('WAZE', 'TDOT', 'NFD'))
-    df = read_dataset(option)
+    df = load_dataset(option)
     st.write('Dataset Summary: ')
     st.write(df.describe())
     start_time = st.slider('Select start time (T_MID):', min(df.pubMillis), max(df.pubMillis))

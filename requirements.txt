@@ -4,9 +4,6 @@ aiohttp-socks==0.3.4
 alabaster==0.7.12
 alembic==1.4.0
 altair==4.0.1
-anaconda-client==1.7.2
-anaconda-navigator==1.9.7
-anaconda-project==0.8.3
 aniso8601==8.0.0
 appdirs==1.4.4
 applaunchservices==0.2.1
@@ -51,12 +48,7 @@ click==7.1.2
 click-plugins==1.1.1
 cligj==0.5.0
 cloudpickle==1.4.1
-clyent==1.2.2
 colorama==0.4.3
-conda==4.8.3
-conda-build==3.18.9
-conda-package-handling==1.7.0
-conda-verify==3.4.2
 configparser==5.0.0
 contextlib2==0.6.0.post1
 coreapi==2.3.3
@@ -78,7 +70,6 @@ distributed==2.10.0
 docutils==0.15.2
 elasticsearch==7.5.1
 emoji==0.5.4
-en-core-web-sm==2.0.0
 entrypoints==0.3
 enum-compat==0.0.3
 et-xmlfile==1.0.1
