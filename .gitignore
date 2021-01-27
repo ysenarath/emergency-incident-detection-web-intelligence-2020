@@ -1,0 +1,10 @@
+/.idea/
+/output/
+/resources/
+/config.ini
+/data/
+/.ipynb_checkpoints/
+.DS_Store
+__pycache__/
+/streamlit/output/
+/streamlit/data/

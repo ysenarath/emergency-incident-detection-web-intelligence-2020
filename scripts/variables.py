@@ -1,0 +1,2 @@
+DELTA = 1  # meters
+REGION_PRECISION = 10
