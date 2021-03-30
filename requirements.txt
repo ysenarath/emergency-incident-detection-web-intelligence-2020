@@ -226,7 +226,7 @@ pycurl==7.43.0.5
 pydeck==0.2.1
 pydocstyle==4.0.1
 pyflakes==2.2.0
-Pygments==2.6.1
+Pygments==2.7.4
 pylint==2.4.2
 pymc3==3.9.1
 pymongo==3.10.1
